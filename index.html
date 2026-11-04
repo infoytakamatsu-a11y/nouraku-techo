@@ -42,6 +42,13 @@ nav span{display:block;font-size:20px}
 pre{white-space:pre-wrap;word-break:break-all;background:var(--soft);border-radius:12px;padding:12px;font-family:inherit;font-size:15px;margin:10px 0}
 .note{font-size:13px;color:var(--sub)}
 .seg{display:flex;gap:8px;margin-bottom:10px}
+.big{font-size:26px;font-weight:700;letter-spacing:2px;line-height:1.9;word-break:break-all}
+.chk{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+.chk span{background:var(--soft);border-radius:999px;padding:6px 12px;font-size:14px;color:var(--sub)}
+.chk span.ok{background:var(--main);color:#fff}
+.num{width:84px;border:1.5px solid var(--line);border-radius:10px;padding:8px;font-size:18px;background:var(--card);color:var(--ink);text-align:center}
+.qrow{display:flex;align-items:center;gap:10px;margin:10px 0;font-size:18px}
+.bad{color:#d0453a;font-weight:700}
 .toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:999px;font-size:14px;opacity:0;transition:.3s;pointer-events:none}
 .toast.show{opacity:1}
 </style>
@@ -58,6 +65,14 @@ pre{white-space:pre-wrap;word-break:break-all;background:var(--soft);border-radi
     <div class="card" id="weeklyCard"><h2>日曜のふり返り質問</h2><div id="weekly"></div></div>
     <div class="card"><h2>ひとこと（書かなくてもOK）</h2><textarea id="memo" placeholder="今日のこと、なんでも"></textarea></div>
     <div class="card"><h2>おまけ：今日のクイズ</h2><div id="quiz"></div></div>
+  </section>
+
+  <!-- トレーニング -->
+  <section id="tab-train" class="hidden">
+    <div class="card"><h2>今日のトレーニング（約5分）</h2><div id="trProg"></div></div>
+    <div class="card"><h2>① ウォームアップ（計算5問・1分）</h2><div id="trCalc"></div></div>
+    <div class="card"><h2>② 円周率チャレンジ（2分）</h2><div id="trPi"></div></div>
+    <div class="card"><h2>③ 言葉の記憶（2分）</h2><div id="trWords"></div></div>
   </section>
 
   <!-- ふり返り -->
@@ -95,6 +110,7 @@ pre{white-space:pre-wrap;word-break:break-all;background:var(--soft);border-radi
 
 <nav>
   <button data-tab="today" class="on"><span>📝</span>きょう</button>
+  <button data-tab="train"><span>🧠</span>トレーニング</button>
   <button data-tab="review"><span>📊</span>ふり返り</button>
   <button data-tab="set"><span>⚙️</span>設定</button>
 </nav>
@@ -248,6 +264,9 @@ function summaryText(n){
   const qd=days.filter(d=>(db[ymd(d)]||{}).quiz!=null).length;
   const qo=days.filter(d=>(db[ymd(d)]||{}).quizOk).length;
   if(qd) lines.push("クイズ："+qd+"日チャレンジ（正解 "+qo+"）");
+  const td=days.filter(d=>{const x=(db[ymd(d)]||{}).train||{};return x.calc&&x.pi&&x.words}).length;
+  const pb=Math.max(0,...days.map(d=>((db[ymd(d)]||{}).train||{}).piM||0));
+  if(td||pb) lines.push("トレーニング：完了 "+td+"日"+(pb?"／円周率 最高 "+pb+"桁":""));
   const memos=days.filter(d=>(db[ymd(d)]||{}).memo).map(d=>" "+jp(d)+"「"+db[ymd(d)].memo.replace(/\n/g," ")+"」");
   if(memos.length){ lines.push("ひとこと："); lines.push(...memos) }
   const wk=days.map(d=>db[ymd(d)]||{}).find(x=>x.w_next);
@@ -283,10 +302,103 @@ $("#importBtn").onclick=()=>{
 /* ---------- タブ ---------- */
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{
   document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("on",x===b));
-  ["today","review","set"].forEach(t=>$("#tab-"+t).classList.toggle("hidden",t!==b.dataset.tab));
-  if(b.dataset.tab==="review") renderReview(); window.scrollTo(0,0);
+  ["today","train","review","set"].forEach(t=>$("#tab-"+t).classList.toggle("hidden",t!==b.dataset.tab));
+  if(b.dataset.tab==="review") renderReview(); if(b.dataset.tab==="train") renderTrain(); window.scrollTo(0,0);
 });
-function renderAll(){ renderItems(); renderWeekly(); renderQuiz(); }
+
+/* ---------- トレーニング ---------- */
+const PI_DEC=["1415926535","8979323846","2643383279","5028841971","6939937510","5820974944","5923078164","0628620899","8628034825","3421170679"].join("");
+const WORDS=["さくら","ねこ","でんしゃ","みかん","はさみ","やま","たいこ","ゆうひ","かばん","りんご","とけい","うみ","ふうせん","おかし","まど","えんぴつ","くつ","ひこうき","ちょうちょ","ふじさん","せんたく","すいか","かさ","つくえ","ぼうし","たまご","はなび","おにぎり","まくら","ほうき","らくだ","こたつ","たこ","ぶどう","かがみ","でんわ","ひまわり","みなと","きっぷ","ふうりん"];
+function rng(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function seed(){return todayD.getFullYear()*10000+(todayD.getMonth()+1)*100+todayD.getDate()}
+function tr(){const d=day(T);return d.train=d.train||{}}
+function piState(){db._pi=db._pi||{level:10,best:0};return db._pi}
+function esc(x){return String(x).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]))}
+function chunk(str,n){const a=[];for(let i=0;i<str.length;i+=n)a.push(str.slice(i,i+n));return a.join(" ")}
+
+function renderTrain(){ renderProg(); renderCalc(); renderPi("intro"); renderWords("intro"); }
+function renderProg(){
+  const t=tr(), all=t.calc&&t.pi&&t.words;
+  $("#trProg").innerHTML='<div class="chk"><span class="'+(t.calc?"ok":"")+'">① 計算</span><span class="'+(t.pi?"ok":"")+'">② 円周率</span><span class="'+(t.words?"ok":"")+'">③ 言葉</span></div>'
+   +(all?'<div class="result"><div class="stamp">🌿</div><div><b>今日のトレーニング完了！</b></div><div style="margin-top:6px">おつかれさまです。</div></div>':'<div class="note">3つ終わると、完了のスタンプが付きます。順番はどこからでもOKです。</div>');
+}
+
+/* ① 計算 */
+function calcQs(){const r=rng(seed());const q=[];for(let i=0;i<5;i++){const k=i%3;let a,b,s,ans;
+  if(k===0){a=10+Math.floor(r()*80);b=10+Math.floor(r()*80);s=a+" ＋ "+b;ans=a+b}
+  else if(k===1){a=50+Math.floor(r()*50);b=10+Math.floor(r()*40);s=a+" − "+b;ans=a-b}
+  else{a=3+Math.floor(r()*7);b=3+Math.floor(r()*7);s=a+" × "+b;ans=a*b}
+  q.push({s,ans})}return q}
+function renderCalc(){
+  const t=tr(), box=$("#trCalc"), qs=calcQs();
+  if(t.calc){ box.innerHTML='<b>'+t.calc.ok+' / 5 問 正解</b><div class="note" style="margin-top:6px">'+qs.map(q=>q.s+" = "+q.ans).join("　／　")+'</div>'; return }
+  box.innerHTML=qs.map((q,i)=>'<div class="qrow"><span style="min-width:110px">'+q.s+' ＝</span><input class="num" inputmode="numeric" id="c'+i+'"></div>').join("")+'<button class="btn full" id="calcGo">答え合わせ</button>';
+  $("#calcGo").onclick=()=>{ let ok=0; qs.forEach((q,i)=>{ if(parseInt($("#c"+i).value,10)===q.ans) ok++ }); tr().calc={ok}; save(); renderTrain(); };
+}
+
+/* ② 円周率 */
+function renderPi(phase,extra){
+  const t=tr(), p=piState(), box=$("#trPi"), n=p.level;
+  if(phase==="intro"){
+    box.innerHTML='<p>今日は <b>小数点以下 '+n+'桁</b> に挑戦します。</p><div class="note">自己ベスト：'+p.best+'桁'+(t.piM!=null?'　／　今日の結果：'+t.piM+'桁':'')+'</div><p></p><button class="btn full" id="piGo">'+(t.pi?"もう一度挑戦する":"数字を見る")+'</button>';
+    $("#piGo").onclick=()=>renderPi("show"); return;
+  }
+  if(phase==="show"){
+    box.innerHTML='<div class="big">3.<br>'+chunk(PI_DEC.slice(0,n),5)+'</div><p class="note">ゆっくり、自分のペースで覚えましょう。</p><button class="btn full" id="piHide">覚えた！（数字を隠す）</button>';
+    $("#piHide").onclick=()=>renderPi("input"); return;
+  }
+  if(phase==="input"){
+    box.innerHTML='<p>思い出して入力してください。<br>「3.」のあとの数字だけ入れます。</p><input class="num" style="width:100%;font-size:22px;letter-spacing:3px" inputmode="numeric" id="piIn" autocomplete="off"><p></p><button class="btn full" id="piCheck">答え合わせ</button>';
+    $("#piCheck").onclick=()=>{
+      const v=($("#piIn").value||"").replace(/[^0-9]/g,""), ans=PI_DEC.slice(0,n);
+      let m=0; while(m<v.length&&m<n&&v[m]===ans[m]) m++;
+      const okAll=(m===n);
+      if(okAll) p.level=Math.min(100,n+3);
+      p.best=Math.max(p.best,m); t.pi=true; t.piM=Math.max(t.piM||0,m); save();
+      renderPi("result",{m,n,ans,okAll}); renderProg();
+    }; return;
+  }
+  if(phase==="result"){
+    const {m,n,ans,okAll}=extra;
+    let shown="";
+    for(let i=0;i<ans.length;i++){ if(i&&i%5===0) shown+=" "; if(i===m&&m<n) shown+='<span class="bad">'; shown+=ans[i]; }
+    if(m<n) shown+="</span>";
+    box.innerHTML='<div class="stamp">'+(okAll?"🌿":"🌱")+'</div><p><b>'+(okAll?n+"桁 全部正解！":m+"桁目まで合っていました")+'</b></p>'
+      +(okAll?'<p>次は '+Math.min(100,n+3)+' 桁に挑戦です。</p>':'<p class="note">赤い部分から先が、まだ覚えきれていないところです。</p>')
+      +'<div class="big" style="font-size:20px">3.<br>'+shown+'</div>'
+      +'<p class="note">自己ベスト：'+p.best+'桁</p><button class="btn full sub" id="piAgain">もう一度挑戦する</button>';
+    $("#piAgain").onclick=()=>renderPi("intro");
+  }
+}
+
+/* ③ 言葉の記憶 */
+function pickWords(){const r=rng(seed()+7);const pool=WORDS.slice();for(let i=pool.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]]}return {target:pool.slice(0,6),all:pool.slice(0,12).sort((a,b)=>WORDS.indexOf(a)-WORDS.indexOf(b))}}
+function renderWords(phase,extra){
+  const t=tr(), box=$("#trWords"), w=pickWords();
+  if(phase==="intro"){
+    box.innerHTML=(t.words?'<p><b>今日の結果：'+t.words.ok+' / 6 個</b></p>':'')+'<p>6個の言葉を見て覚えます。</p><button class="btn full" id="wGo">'+(t.words?"もう一度挑戦する":"言葉を見る")+'</button>';
+    $("#wGo").onclick=()=>renderWords("show"); return;
+  }
+  if(phase==="show"){
+    box.innerHTML='<div class="big">'+w.target.join("　")+'</div><p class="note">30秒くらい、ゆっくり見ましょう。</p><button class="btn full" id="wHide">覚えた！（隠す）</button>';
+    $("#wHide").onclick=()=>renderWords("pick",{sel:[]}); return;
+  }
+  if(phase==="pick"){
+    const sel=extra.sel;
+    box.innerHTML='<p>さっきの言葉を6個、選んでください。</p><div class="opts" id="wOpts"></div><p></p><button class="btn full" id="wCheck">答え合わせ</button>';
+    const ob=$("#wOpts");
+    w.all.forEach(x=>{const b=document.createElement("button");b.className="opt"+(sel.includes(x)?" on":"");b.textContent=x;
+      b.onclick=()=>{const i=sel.indexOf(x);if(i>=0)sel.splice(i,1);else sel.push(x);b.classList.toggle("on")};ob.appendChild(b)});
+    $("#wCheck").onclick=()=>{ const ok=sel.filter(x=>w.target.includes(x)).length; tr().words={ok}; save(); renderWords("result",{ok}); renderProg(); };
+    return;
+  }
+  if(phase==="result"){
+    box.innerHTML='<div class="stamp">'+(extra.ok===6?"🌿":"🌱")+'</div><p><b>'+extra.ok+' / 6 個 正解</b></p><p class="note">答え：'+w.target.join("、")+'</p><button class="btn full sub" id="wAgain">もう一度挑戦する</button>';
+    $("#wAgain").onclick=()=>renderWords("intro");
+  }
+}
+
+function renderAll(){ renderItems(); renderWeekly(); renderQuiz(); renderTrain(); }
 renderAll();
 </script>
 </body>
