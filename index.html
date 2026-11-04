@@ -61,7 +61,8 @@ pre{white-space:pre-wrap;word-break:break-all;background:var(--soft);border-radi
 <main>
   <!-- きょう -->
   <section id="tab-today">
-    <div class="card"><h2>今日の暮らし（タップだけ・1分）</h2><div id="items"></div></div>
+    <div id="chkBanner"></div>
+    <div class="card"><h2>今日の暮らし（タップだけ・1分）</h2><div id="score" class="result" style="margin:0 0 8px"></div><div id="items"></div></div>
     <div class="card" id="weeklyCard"><h2>日曜のふり返り質問</h2><div id="weekly"></div></div>
     <div class="card"><h2>ひとこと（書かなくてもOK）</h2><textarea id="memo" placeholder="今日のこと、なんでも"></textarea></div>
     <div class="card"><h2>おまけ：今日のクイズ</h2><div id="quiz"></div></div>
@@ -75,6 +76,11 @@ pre{white-space:pre-wrap;word-break:break-all;background:var(--soft);border-radi
     <div class="card"><h2>③ 言葉の記憶（2分）</h2><div id="trWords"></div></div>
   </section>
 
+  <!-- はじめのチェック -->
+  <section id="tab-check" class="hidden">
+    <div class="card" id="chkBox"></div>
+  </section>
+
   <!-- ふり返り -->
   <section id="tab-review" class="hidden">
     <div class="card">
@@ -83,11 +89,13 @@ pre{white-space:pre-wrap;word-break:break-all;background:var(--soft);border-radi
         <button class="btn sub" id="p30">直近30日</button>
       </div>
       <div id="chartArea"></div>
+      <div id="goodBad" style="margin-top:12px"></div>
       <h2 style="margin-top:16px">先生に送る文章</h2>
       <p class="note">LINEのトークに貼り付けると、そのまま送れます。送る前に中身を見て、直してもOKです。</p>
       <pre id="summary"></pre>
       <button class="btn full" id="copyBtn">コピーする</button>
     </div>
+    <div class="card" id="chkReviewCard"></div>
   </section>
 
   <!-- 設定 -->
@@ -207,7 +215,13 @@ function chips(box, opts, cur, onPick, cls){
     b.onclick=()=>{ onPick(cur===o?null:o); }; box.appendChild(b);
   });
 }
+function renderScore(){
+  const d=day(T); const filled=ITEMS.filter(it=>d[it.key]!=null).length;
+  const best=ITEMS.filter(it=>d[it.key]===it.opts[0]).length;
+  $("#score").innerHTML=filled?('<b>今日：いちばん良い選択 '+best+' / '+ITEMS.length+'</b><div class="note">入力 '+filled+' / '+ITEMS.length+'　'+(filled===ITEMS.length?(best>=8?"とても良い一日です 🌿":best>=5?"いい感じの一日です 🌱":"今日はお疲れ気味かも。ゆっくり休んで ✨"):"")+'</div>'):'<div class="note">下の項目をタップすると、ここに今日の手応えが出ます。</div>';
+}
 function renderItems(){
+  renderScore();
   const d=day(T), box=$("#items"); box.innerHTML="";
   const mr=document.createElement("div"); mr.className="row";
   mr.innerHTML='<div class="lb">気分</div>'; const mb=document.createElement("div"); mr.appendChild(mb); box.appendChild(mr);
@@ -267,6 +281,11 @@ function summaryText(n){
   const td=days.filter(d=>{const x=(db[ymd(d)]||{}).train||{};return x.calc&&x.pi&&x.words}).length;
   const pb=Math.max(0,...days.map(d=>((db[ymd(d)]||{}).train||{}).piM||0));
   if(td||pb) lines.push("トレーニング：完了 "+td+"日"+(pb?"／円周率 最高 "+pb+"桁":""));
+  const gb=goodBad(days);
+  if(gb.good.length) lines.push("得意な習慣："+gb.good.join("、"));
+  if(gb.bad.length) lines.push("あと一歩の習慣："+gb.bad.join("、"));
+  const ck=lastCheck();
+  if(ck && days.some(d=>ymd(d)===ck.date)) lines.push("はじめのチェック（"+jp(new Date(ck.date.replace(/-/g,"/")))+"）："+CHK_AREAS.map(a=>a.name+levelOf(ck.areas[a.key]).icon).join(" "));
   const memos=days.filter(d=>(db[ymd(d)]||{}).memo).map(d=>" "+jp(d)+"「"+db[ymd(d)].memo.replace(/\n/g," ")+"」");
   if(memos.length){ lines.push("ひとこと："); lines.push(...memos) }
   const wk=days.map(d=>db[ymd(d)]||{}).find(x=>x.w_next);
@@ -282,7 +301,7 @@ function renderChart(){
   h+='</div><div class="days">'; days.forEach(d=>{ h+='<div>'+(d.getMonth()+1)+'/'+d.getDate()+'</div>' }); h+='</div>';
   box.innerHTML=h;
 }
-function renderReview(){ $("#summary").textContent=summaryText(period); renderChart(); }
+function renderReview(){ $("#summary").textContent=summaryText(period); renderChart(); renderGoodBad(); renderChkReviewCard(); }
 $("#p7").onclick=()=>{period=7;renderReview()};
 $("#p30").onclick=()=>{period=30;renderReview()};
 async function copyText(txt, okMsg){
@@ -300,11 +319,13 @@ $("#importBtn").onclick=()=>{
 };
 
 /* ---------- タブ ---------- */
-document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{
-  document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("on",x===b));
-  ["today","train","review","set"].forEach(t=>$("#tab-"+t).classList.toggle("hidden",t!==b.dataset.tab));
-  if(b.dataset.tab==="review") renderReview(); if(b.dataset.tab==="train") renderTrain(); window.scrollTo(0,0);
-});
+function showTab(t){
+  document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("on",x.dataset.tab===t));
+  ["today","train","review","set","check"].forEach(x=>$("#tab-"+x).classList.toggle("hidden",x!==t));
+  if(t==="review") renderReview(); if(t==="train") renderTrain(); if(t==="check") renderCheck(); if(t==="today") renderBanner();
+  window.scrollTo(0,0);
+}
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
 
 /* ---------- トレーニング ---------- */
 const PI_DEC=["1415926535","8979323846","2643383279","5028841971","6939937510","5820974944","5923078164","0628620899","8628034825","3421170679"].join("");
@@ -398,8 +419,97 @@ function renderWords(phase,extra){
   }
 }
 
-function renderAll(){ renderItems(); renderWeekly(); renderQuiz(); renderTrain(); }
+/* ---------- 得意・あと一歩 ---------- */
+function goodBad(days){
+  const stat=ITEMS.map(it=>{let n=0,g=0;days.forEach(d=>{const v=(db[ymd(d)]||{})[it.key];if(v!=null){n++;if(v===it.opts[0])g++}});return {it,n,r:n?g/n:null}}).filter(x=>x.n>=2);
+  const good=stat.filter(x=>x.r>=0.6).sort((a,b)=>b.r-a.r).slice(0,3).map(x=>x.it.sum);
+  const bad=stat.filter(x=>x.r<0.5).sort((a,b)=>a.r-b.r).slice(0,3).map(x=>x.it.sum);
+  return {good,bad};
+}
+function renderGoodBad(){
+  const gb=goodBad(span(period)), box=$("#goodBad");
+  if(!gb.good.length&&!gb.bad.length){ box.innerHTML='<div class="note">2日以上記録すると、得意な習慣とあと一歩の習慣が出ます。</div>'; return }
+  box.innerHTML=(gb.good.length?'<div>🌿 得意：<b>'+gb.good.join("、")+'</b></div>':'')+(gb.bad.length?'<div>🌱 あと一歩：<b>'+gb.bad.join("、")+'</b></div>':'');
+}
+
+/* ---------- はじめのチェック ---------- */
+const CHK_AREAS=[
+  {key:"sleep",name:"睡眠",qs:["平日に、6〜7時間くらい眠れている","朝、すっきり起きられる"],tip:"寝る時間を、30分だけそろえてみましょう",good:"睡眠のリズムが整っています"},
+  {key:"food",name:"食事",qs:["朝食を食べている","野菜・魚・豆などを意識している"],tip:"朝に何か一口入れる、野菜をひと品足す、から始めましょう",good:"食事のバランスがいい感じです"},
+  {key:"move",name:"運動",qs:["週に2〜3回は、体を動かしている","1日のなかで、歩く時間がある"],tip:"ひと駅ぶん歩く、階段を使う、から始めましょう",good:"体をよく動かせています"},
+  {key:"mind",name:"心",qs:["気持ちを切り替えられる","楽しみな時間がある"],tip:"深呼吸や好きな音楽で、ひと息つく時間を作りましょう",good:"気持ちの切り替えが上手です"},
+  {key:"link",name:"つながり",qs:["人と話して、笑う時間がある","相談できる人がいる"],tip:"1日1回、誰かと話して笑う時間を作ってみましょう",good:"人とのつながりが力になっています"},
+  {key:"brain",name:"頭の使い方",qs:["新しいことに触れる機会がある","スマホ以外で、集中する時間がある"],tip:"10分だけスマホを置いて、本や趣味に集中してみましょう",good:"頭をよく使えています"}
+];
+const CHK_OPTS=["はい","ときどき","あまりない"];
+function levelOf(n){ return n>=3?{icon:"🌿",label:"いい感じ"}:n===2?{icon:"🌱",label:"あと一歩"}:{icon:"✨",label:"のびしろ"} }
+function checks(){ return db._check=db._check||[] }
+function lastCheck(){ const c=checks(); return c.length?c[c.length-1]:null }
+function daysSince(dstr){ const a=new Date(dstr.replace(/-/g,"/")); return Math.floor((new Date(todayD.getFullYear(),todayD.getMonth(),todayD.getDate())-a)/86400000) }
+
+function renderBanner(){
+  const box=$("#chkBanner"), c=lastCheck();
+  if(c && daysSince(c.date)<30){ box.innerHTML=""; return }
+  box.innerHTML='<div class="card" style="background:var(--soft)"><b>'+(c?"1か月たちました。もう一度チェックしてみましょう":"はじめのチェックをしてみましょう（約2分）")+'</b><p class="note" style="margin:4px 0 10px">今の暮らしを知るためのチェックです。'+(c?"前回との変化も見られます。":"点数やあてはまり具合で良し悪しを決めるものではありません。")+'</p><button class="btn" id="chkGo">チェックする</button></div>';
+  $("#chkGo").onclick=()=>{ chkMode="form"; showTab("check") };
+}
+let chkMode="auto", chkAns={};
+function renderCheck(){
+  const box=$("#chkBox"), c=lastCheck();
+  if(chkMode==="auto") chkMode=c?"result":"form";
+  if(chkMode==="result" && c){ renderChkResult(box,c); return }
+  chkAns={};
+  let h='<h2>はじめのチェック（今の自分を知ろう）</h2><p class="note">いまの暮らしに近いものを選んでください。良い・悪いを決めるものではなく、整えるヒントを見つけるためのものです。</p>';
+  CHK_AREAS.forEach((a,ai)=>a.qs.forEach((q,qi)=>{ h+='<div class="row"><div class="lb">'+a.name+'：'+q+'</div><div class="opts" id="cq'+ai+'_'+qi+'"></div></div>' }));
+  h+='<button class="btn full" id="chkDone">結果を見る</button>';
+  box.innerHTML=h;
+  CHK_AREAS.forEach((a,ai)=>a.qs.forEach((q,qi)=>{
+    const ob=$("#cq"+ai+"_"+qi);
+    CHK_OPTS.forEach((o,oi)=>{ const b=document.createElement("button"); b.className="opt"; b.textContent=o;
+      b.onclick=()=>{ chkAns[ai+"_"+qi]=2-oi; ob.querySelectorAll(".opt").forEach(x=>x.classList.remove("on")); b.classList.add("on") }; ob.appendChild(b) });
+  }));
+  $("#chkDone").onclick=()=>{
+    const total=CHK_AREAS.reduce((n,a)=>n+a.qs.length,0);
+    if(Object.keys(chkAns).length<total){ toast("すべての質問に答えてください（あと"+(total-Object.keys(chkAns).length)+"問）"); return }
+    const areas={}; CHK_AREAS.forEach((a,ai)=>{ areas[a.key]=a.qs.reduce((s,q,qi)=>s+chkAns[ai+"_"+qi],0) });
+    checks().push({date:T,areas}); save(); chkMode="result"; renderCheck(); renderBanner(); window.scrollTo(0,0);
+  };
+}
+function chkSummary(c,prev){
+  const ls=CHK_AREAS.map(a=>c.areas[a.key]);
+  const mx=Math.max(...ls), mn=Math.min(...ls);
+  const strong=CHK_AREAS.find(a=>c.areas[a.key]===mx), focus=CHK_AREAS.find(a=>c.areas[a.key]===mn);
+  return {mx,mn,strong,focus};
+}
+function renderChkResult(box,c){
+  const c_=checks(), idx=c_.indexOf(c), prev=idx>0?c_[idx-1]:null, sm=chkSummary(c,prev);
+  let h='<h2>はじめのチェックの結果（'+jp(new Date(c.date.replace(/-/g,"/")))+'）</h2>';
+  CHK_AREAS.forEach(a=>{ const v=c.areas[a.key], L=levelOf(v);
+    h+='<div class="row"><div><b>'+a.name+'</b>　'+L.icon+' '+L.label+(prev?'　<span class="note">前回：'+levelOf(prev.areas[a.key]).icon+'</span>':'')+'</div><div class="bars" style="height:14px;margin-top:4px"><div class="bar" style="min-height:0;height:14px"><i style="width:'+(v/4*100)+'%;height:14px;right:auto"></i></div></div></div>' });
+  if(sm.mx===sm.mn){ h+='<div class="result"><b>どの分野も同じくらいのバランスです。</b><div style="margin-top:6px">まずは「日記」で毎日の記録をつけて、変化を見ていきましょう。</div></div>' }
+  else{ h+='<div class="result"><div>🌿 <b>いまの強み：'+sm.strong.name+'</b>　'+sm.strong.good+'</div><div style="margin-top:8px">✨ <b>まず整えるなら：'+sm.focus.name+'</b>　'+sm.focus.tip+'</div></div>' }
+  h+='<p class="note">これは病気の診断ではなく、暮らしを見つめるためのものです。</p>';
+  h+='<button class="btn full" id="chkCopy">結果をコピーする（先生に送る）</button><p></p><button class="btn full sub" id="chkAgain">もう一度チェックする</button>';
+  box.innerHTML=h;
+  $("#chkCopy").onclick=()=>{
+    let t="【はじめのチェック "+jp(new Date(c.date.replace(/-/g,"/")))+"】\n"+CHK_AREAS.map(a=>a.name+"："+levelOf(c.areas[a.key]).icon+levelOf(c.areas[a.key]).label).join("\n");
+    if(sm.mx!==sm.mn) t+="\nいまの強み："+sm.strong.name+"\nまず整えるなら："+sm.focus.name;
+    copyText(t,"コピーしました。LINEに貼り付けてください");
+  };
+  $("#chkAgain").onclick=()=>{ chkMode="form"; renderCheck(); window.scrollTo(0,0) };
+}
+function renderChkReviewCard(){
+  const box=$("#chkReviewCard"), c=lastCheck();
+  if(!c){ box.innerHTML='<h2>はじめのチェック</h2><p class="note">まだチェックしていません。</p><button class="btn full sub" id="rvChk">チェックする</button>'; $("#rvChk").onclick=()=>{ chkMode="form"; showTab("check") }; return }
+  const sm=chkSummary(c);
+  box.innerHTML='<h2>はじめのチェック（'+jp(new Date(c.date.replace(/-/g,"/")))+'）</h2><div>'+CHK_AREAS.map(a=>a.name+' '+levelOf(c.areas[a.key]).icon).join('　')+'</div><p></p><button class="btn full sub" id="rvChk">くわしく見る／もう一度チェック</button>';
+  $("#rvChk").onclick=()=>{ chkMode="result"; showTab("check") };
+}
+
+function renderAll(){ renderItems(); renderWeekly(); renderQuiz(); renderTrain(); renderBanner(); }
+const firstLaunch=!lastCheck() && !Object.keys(db).some(k=>/^\d{4}-/.test(k)&&Object.keys(db[k]).length);
 renderAll();
+if(firstLaunch){ chkMode="form"; showTab("check") }
 </script>
 </body>
 </html>
