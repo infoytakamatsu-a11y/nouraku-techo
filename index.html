@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>まいにち脳ラク手帖</title>
+<style>
+:root{--bg:#f6f8f3;--card:#fff;--ink:#2b3a33;--sub:#6b7a72;--main:#3f8f78;--main-d:#2f735f;--soft:#e3f1ec;--line:#dfe6e1;--warn:#e7a23c}
+@media (prefers-color-scheme:dark){:root{--bg:#18211d;--card:#222d28;--ink:#e8f0ec;--sub:#9fb0a7;--main:#5fb89d;--main-d:#7fd0b6;--soft:#2b3d36;--line:#344640}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;font-size:16px;line-height:1.6;padding-bottom:84px}
+header{padding:20px 16px 8px}
+h1{font-size:20px;margin:0}
+.date{color:var(--sub);font-size:14px}
+main{padding:0 16px;max-width:560px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin:12px 0}
+.card h2{font-size:16px;margin:0 0 10px}
+.row{margin:12px 0}
+.row .lb{font-size:14px;color:var(--sub);margin-bottom:6px}
+.opts{display:flex;flex-wrap:wrap;gap:8px}
+.opt{border:1.5px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:9px 14px;font-size:15px;cursor:pointer;min-height:44px}
+.opt.on{background:var(--main);border-color:var(--main);color:#fff;font-weight:600}
+.mood .opt{font-size:24px;padding:6px 12px}
+textarea{width:100%;border:1.5px solid var(--line);border-radius:12px;padding:10px;font-size:16px;background:var(--card);color:var(--ink);min-height:70px;font-family:inherit}
+.btn{background:var(--main);color:#fff;border:0;border-radius:12px;padding:12px 18px;font-size:16px;font-weight:600;cursor:pointer;min-height:48px}
+.btn.sub{background:var(--soft);color:var(--main-d)}
+.btn.full{width:100%}
+.q{font-size:17px;font-weight:600;margin:4px 0 12px}
+.result{margin-top:12px;padding:12px;border-radius:12px;background:var(--soft)}
+.stamp{font-size:34px;text-align:center}
+nav{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);display:flex;padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;border:0;background:none;color:var(--sub);padding:12px 0;font-size:13px;cursor:pointer;min-height:56px}
+nav button.on{color:var(--main-d);font-weight:700}
+nav span{display:block;font-size:20px}
+.hidden{display:none}
+.bars{display:flex;gap:6px;align-items:flex-end;height:64px}
+.bar{flex:1;background:var(--soft);border-radius:6px;position:relative;min-height:6px}
+.bar i{position:absolute;left:0;right:0;bottom:0;background:var(--main);border-radius:6px}
+.days{display:flex;gap:6px;font-size:12px;color:var(--sub);text-align:center}
+.days div{flex:1}
+pre{white-space:pre-wrap;word-break:break-all;background:var(--soft);border-radius:12px;padding:12px;font-family:inherit;font-size:15px;margin:10px 0}
+.note{font-size:13px;color:var(--sub)}
+.seg{display:flex;gap:8px;margin-bottom:10px}
+.toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:999px;font-size:14px;opacity:0;transition:.3s;pointer-events:none}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="appName"></h1>
+  <div class="date" id="today"></div>
+</header>
+<main>
+  <!-- きょう -->
+  <section id="tab-today">
+    <div class="card"><h2>今日の暮らし（タップだけ・1分）</h2><div id="items"></div></div>
+    <div class="card" id="weeklyCard"><h2>日曜のふり返り質問</h2><div id="weekly"></div></div>
+    <div class="card"><h2>ひとこと（書かなくてもOK）</h2><textarea id="memo" placeholder="今日のこと、なんでも"></textarea></div>
+    <div class="card"><h2>おまけ：今日のクイズ</h2><div id="quiz"></div></div>
+  </section>
+
+  <!-- ふり返り -->
+  <section id="tab-review" class="hidden">
+    <div class="card">
+      <div class="seg">
+        <button class="btn sub" id="p7">直近7日</button>
+        <button class="btn sub" id="p30">直近30日</button>
+      </div>
+      <div id="chartArea"></div>
+      <h2 style="margin-top:16px">先生に送る文章</h2>
+      <p class="note">LINEのトークに貼り付けると、そのまま送れます。送る前に中身を見て、直してもOKです。</p>
+      <pre id="summary"></pre>
+      <button class="btn full" id="copyBtn">コピーする</button>
+    </div>
+  </section>
+
+  <!-- 設定 -->
+  <section id="tab-set" class="hidden">
+    <div class="card">
+      <h2>バックアップ</h2>
+      <p class="note">記録はこのスマホの中だけに保存されています。機種変更や削除に備えて、ときどきコピーして保管してください。</p>
+      <button class="btn full sub" id="exportBtn">記録をコピーする</button>
+      <p></p>
+      <textarea id="importBox" placeholder="コピーした記録をここに貼り付け"></textarea>
+      <p></p>
+      <button class="btn full sub" id="importBtn">貼り付けた記録を読み込む</button>
+    </div>
+    <div class="card">
+      <h2>このアプリについて</h2>
+      <p class="note">毎日の暮らしを記録して、自分の習慣を見える化する手帖です。病気の診断や治療を目的としたものではありません。</p>
+    </div>
+  </section>
+</main>
+
+<nav>
+  <button data-tab="today" class="on"><span>📝</span>きょう</button>
+  <button data-tab="review"><span>📊</span>ふり返り</button>
+  <button data-tab="set"><span>⚙️</span>設定</button>
+</nav>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ==========================================================
+   ここから下の「設定」を書き換えるだけで、内容を変えられます
+   ========================================================== */
+const APP_NAME = "まいにち脳ラク手帖";
+
+// 毎日の質問。key=保存名 / label=見出し / opts=選択肢 / summary=ふり返りの見出し
+const ITEMS = [
+  {key:"sleep",   label:"睡眠",             sum:"睡眠",           opts:["6時間以上ぐっすり","浅かった","あまり眠れない"]},
+  {key:"phone",   label:"寝る前のスマホ",   sum:"寝る前スマホ",   opts:["控えた","少し見た","ずっと見た"]},
+  {key:"move",    label:"体を動かした",     sum:"運動",           opts:["30分以上","少し","ほぼ動かず"]},
+  {key:"bfast",   label:"朝食",             sum:"朝食",           opts:["食べた","食べない"]},
+  {key:"veg",     label:"野菜か魚をとった", sum:"野菜か魚",       opts:["とった","とれず"]},
+  {key:"sweet",   label:"甘い飲み物・お菓子", sum:"甘い物",       opts:["控えた","とった"]},
+  {key:"water",   label:"水分",             sum:"水分",           opts:["こまめにとれた","少なかった"]},
+  {key:"talk",    label:"人と話した・笑った", sum:"人と話した・笑った", opts:["しっかり","少し","ほぼなし"]},
+  {key:"clear",   label:"頭のスッキリ度",   sum:"頭のスッキリ度", opts:["冴えていた","ふつう","ぼんやり"]},
+  {key:"alcohol", label:"お酒・たばこ",     sum:"お酒・たばこ",   opts:["なし","少し","多め"]}
+];
+const MOODS = ["😊","🙂","😐","😟","😣"];
+
+// 日曜に出る質問（自由に追加・変更OK）
+const WEEKLY = [
+  {key:"w_rest", label:"今週、しっかり休めた？", opts:["休めた","まあまあ","休めず"]},
+  {key:"w_best", label:"続けられた習慣はどれ？（例：朝食、散歩）", text:true},
+  {key:"w_next", label:"来週、整えたいことは？", text:true}
+];
+
+// クイズ30問（日替わり。q=問題 / c=選択肢 / a=正解の番号(0から) / note=豆知識）
+const OX=["○","×"];
+const QUIZ = [
+  {q:"睡眠不足の日は、甘い物がほしくなりやすい。",c:OX,a:0,note:"睡眠が足りないと食欲のバランスが乱れやすいと言われています。"},
+  {q:"ウォーキングなどの運動は、気分転換に役立つ。",c:OX,a:0,note:"軽い運動は、気持ちを切り替えるきっかけになります。"},
+  {q:"夜ふかしの分は、休日の寝だめで完全に取り戻せる。",c:OX,a:1,note:"寝だめより、毎日の睡眠リズムを整えるほうが大切です。"},
+  {q:"朝の光を浴びると、体内時計が整いやすい。",c:OX,a:0,note:"朝起きたらカーテンを開けるだけでもOKです。"},
+  {q:"寝る前の強い光（スマホ）は、寝つきに影響しやすい。",c:OX,a:0,note:"寝る30分前から画面を控えると、眠りに入りやすくなります。"},
+  {q:"水分が少し足りないだけでも、集中しにくくなることがある。",c:OX,a:0,note:"のどが渇く前に、少しずつ飲むのがおすすめです。"},
+  {q:"人と会って話すことは、頭への良い刺激になる。",c:OX,a:0,note:"おしゃべりは、言葉を選んだり相手を気づかったりする頭の運動です。"},
+  {q:"休憩なしで何時間も続けるほうが、集中力は保てる。",c:OX,a:1,note:"90分に1回など、短い休憩をはさむほうが続きます。"},
+  {q:"朝食を食べると、頭を使うためのエネルギーを補給できる。",c:OX,a:0,note:"バナナやヨーグルトなど、軽いものからでも大丈夫です。"},
+  {q:"ストレスを感じたとき、ゆっくり深呼吸するのは気持ちを落ち着ける方法のひとつ。",c:OX,a:0,note:"吐く息を長めにすると、ほっとしやすいと言われます。"},
+  {q:"「七転び八◯」◯に入るのは？",c:["起き","走り","笑い"],a:0,note:"何度失敗しても立ち上がる、という意味です。"},
+  {q:"「石の上にも◯年」◯に入るのは？",c:["一","三","十"],a:1,note:"がまん強く続ければ報われる、という意味です。"},
+  {q:"「憂鬱」の読み方は？",c:["ゆうつう","ゆううつ","ゆうゆう"],a:1,note:"気持ちがふさぐこと。"},
+  {q:"「蘊蓄」の読み方は？",c:["うんちく","おんちく","いんちく"],a:0,note:"「蘊蓄を傾ける」＝持っている知識を披露すること。"},
+  {q:"「脆い」の読み方は？",c:["もろい","かたい","つらい"],a:0,note:"こわれやすい、という意味です。"},
+  {q:"正しいのはどれ？",c:["ふいんき","ふんいき","ふいいき"],a:1,note:"漢字は「雰囲気」。「ふいんき」は言い間違いが定着したものです。"},
+  {q:"「急がば◯」◯に入るのは？",c:["走れ","回れ","止まれ"],a:1,note:"急ぐときほど、確実な道を行くほうが早いという意味です。"},
+  {q:"「花より◯」◯に入るのは？",c:["団子","木","水"],a:0,note:"見て楽しむより、食べるほうが好き、というたとえです。"},
+  {q:"7 × 8 は？",c:["54","56","63"],a:1,note:"七の段は、しちはごじゅうろく。"},
+  {q:"1000円のランチが2割引き。いくら？",c:["700円","800円","900円"],a:1,note:"1000円 × 0.8 = 800円です。"},
+  {q:"午後3時の5時間後は？",c:["午後7時","午後8時","午後9時"],a:1,note:"24時間表記だと20時です。"},
+  {q:"ある数に3を足して2倍したら20。ある数は？",c:["5","7","10"],a:1,note:"20÷2=10、10−3=7。"},
+  {q:"0.5時間は何秒？",c:["900秒","1800秒","3600秒"],a:1,note:"1時間は3600秒なので、半分は1800秒です。"},
+  {q:"3、6、9、12、次の数は？",c:["14","15","18"],a:1,note:"3ずつ増えています。"},
+  {q:"1年でいちばん昼が長い日は？",c:["夏至","冬至","春分"],a:0,note:"日本では6月21日ごろです。"},
+  {q:"世界でいちばん面積が小さい国は？",c:["モナコ","バチカン","マルタ"],a:1,note:"東京ディズニーランドよりも小さい国です。"},
+  {q:"ピアノの1オクターブにある白鍵はいくつ？",c:["7個","8個","12個"],a:0,note:"ドレミファソラシの7つです。"},
+  {q:"日本で、虹は何色と言われる？",c:["5色","7色","9色"],a:1,note:"国によって数え方が違います。"},
+  {q:"地球の表面の約何割が海？",c:["約3割","約5割","約7割"],a:2,note:"「水の惑星」と呼ばれる理由です。"},
+  {q:"1週間は何時間？",c:["148時間","168時間","188時間"],a:1,note:"24 × 7 = 168 です。"}
+];
+/* ========================= 設定ここまで ========================= */
+
+const KEY = "nouraku_v1";
+const $ = s => document.querySelector(s);
+const pad = n => String(n).padStart(2,"0");
+const ymd = d => d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+const jp = d => (d.getMonth()+1)+"/"+d.getDate();
+let db = load();
+const todayD = new Date();
+const T = ymd(todayD);
+
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{} }catch(e){ return {} } }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(db)) }catch(e){ toast("保存できませんでした") } }
+function day(k){ return db[k] = db[k] || {} }
+function toast(m){ const t=$("#toast"); t.textContent=m; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),1800) }
+
+document.title = APP_NAME;
+$("#appName").textContent = APP_NAME;
+$("#today").textContent = (todayD.getMonth()+1)+"月"+todayD.getDate()+"日（"+"日月火水木金土"[todayD.getDay()]+"）";
+
+/* ---------- きょう ---------- */
+function chips(box, opts, cur, onPick, cls){
+  box.innerHTML=""; box.className="opts "+(cls||"");
+  opts.forEach((o,i)=>{
+    const b=document.createElement("button");
+    b.className="opt"+(cur===o?" on":""); b.textContent=o;
+    b.onclick=()=>{ onPick(cur===o?null:o); }; box.appendChild(b);
+  });
+}
+function renderItems(){
+  const d=day(T), box=$("#items"); box.innerHTML="";
+  const mr=document.createElement("div"); mr.className="row";
+  mr.innerHTML='<div class="lb">気分</div>'; const mb=document.createElement("div"); mr.appendChild(mb); box.appendChild(mr);
+  chips(mb,MOODS,d.mood,v=>{d.mood=v;save();renderItems()},"mood");
+  ITEMS.forEach(it=>{
+    const r=document.createElement("div"); r.className="row";
+    r.innerHTML='<div class="lb">'+it.label+'</div>'; const b=document.createElement("div"); r.appendChild(b); box.appendChild(r);
+    chips(b,it.opts,d[it.key],v=>{ if(v==null) delete d[it.key]; else d[it.key]=v; save(); renderItems(); });
+  });
+}
+function renderWeekly(){
+  const card=$("#weeklyCard");
+  if(todayD.getDay()!==0){ card.classList.add("hidden"); return }
+  const d=day(T), box=$("#weekly"); box.innerHTML="";
+  WEEKLY.forEach(w=>{
+    const r=document.createElement("div"); r.className="row"; r.innerHTML='<div class="lb">'+w.label+'</div>';
+    if(w.text){ const t=document.createElement("textarea"); t.value=d[w.key]||""; t.oninput=()=>{d[w.key]=t.value;save()}; r.appendChild(t) }
+    else{ const b=document.createElement("div"); r.appendChild(b); chips(b,w.opts,d[w.key],v=>{ if(v==null) delete d[w.key]; else d[w.key]=v; save(); renderWeekly() }) }
+    box.appendChild(r);
+  });
+}
+$("#memo").value = day(T).memo||"";
+$("#memo").oninput = e => { day(T).memo = e.target.value; save() };
+
+function quizIndex(){ const base=new Date(2026,0,1); return Math.floor((new Date(todayD.getFullYear(),todayD.getMonth(),todayD.getDate())-base)/86400000) % QUIZ.length }
+function renderQuiz(){
+  const qz=QUIZ[quizIndex()], d=day(T), box=$("#quiz");
+  box.innerHTML='<div class="q">'+qz.q+'</div>';
+  const ob=document.createElement("div"); ob.className="opts"; box.appendChild(ob);
+  qz.c.forEach((c,i)=>{
+    const b=document.createElement("button"); b.className="opt"+(d.quiz===i?" on":""); b.textContent=c;
+    b.onclick=()=>{ if(d.quiz==null){ d.quiz=i; d.quizOk=(i===qz.a); save(); renderQuiz() } };
+    ob.appendChild(b);
+  });
+  if(d.quiz!=null){
+    const r=document.createElement("div"); r.className="result";
+    r.innerHTML='<div class="stamp">🌿</div><div><b>'+(d.quizOk?"正解！":"おしい！答えは「"+qz.c[qz.a]+"」")+'</b></div><div class="note" style="margin-top:6px">'+qz.note+'</div><div style="margin-top:8px">今日も記録できました。おつかれさまです。</div>';
+    box.appendChild(r);
+  }
+}
+
+/* ---------- ふり返り ---------- */
+let period=7;
+function span(n){ const a=[]; for(let i=n-1;i>=0;i--){ const d=new Date(todayD); d.setDate(d.getDate()-i); a.push(d) } return a }
+function summaryText(n){
+  const days=span(n), lines=[];
+  lines.push("【"+(n===7?"今週":"最近"+n+"日")+"の記録 "+jp(days[0])+"〜"+jp(days[days.length-1])+"】");
+  const moods=days.map(d=>(db[ymd(d)]||{}).mood||"・").join("");
+  lines.push("気分："+moods);
+  ITEMS.forEach(it=>{
+    const parts=[]; it.opts.forEach(o=>{ const c=days.filter(d=>(db[ymd(d)]||{})[it.key]===o).length; if(c) parts.push(o+" "+c+"日") });
+    if(parts.length) lines.push(it.sum+"："+parts.join("／"));
+  });
+  const qd=days.filter(d=>(db[ymd(d)]||{}).quiz!=null).length;
+  const qo=days.filter(d=>(db[ymd(d)]||{}).quizOk).length;
+  if(qd) lines.push("クイズ："+qd+"日チャレンジ（正解 "+qo+"）");
+  const memos=days.filter(d=>(db[ymd(d)]||{}).memo).map(d=>" "+jp(d)+"「"+db[ymd(d)].memo.replace(/\n/g," ")+"」");
+  if(memos.length){ lines.push("ひとこと："); lines.push(...memos) }
+  const wk=days.map(d=>db[ymd(d)]||{}).find(x=>x.w_next);
+  if(wk && wk.w_next) lines.push("来週整えたいこと："+wk.w_next);
+  if(lines.length<=2) lines.push("（まだ記録がありません）");
+  return lines.join("\n");
+}
+function renderChart(){
+  const days=span(period>7?14:7), box=$("#chartArea");
+  const score=d=>{ const x=db[ymd(d)]||{}; return ITEMS.reduce((s,it)=>s+(x[it.key]===it.opts[0]?1:0),0) };
+  let h='<div class="note">その日の「いちばん良い選択肢」が選べた数（全'+ITEMS.length+'項目）</div><div class="bars" style="margin-top:8px">';
+  days.forEach(d=>{ const s=score(d); h+='<div class="bar"><i style="height:'+(s/ITEMS.length*100)+'%"></i></div>' });
+  h+='</div><div class="days">'; days.forEach(d=>{ h+='<div>'+(d.getMonth()+1)+'/'+d.getDate()+'</div>' }); h+='</div>';
+  box.innerHTML=h;
+}
+function renderReview(){ $("#summary").textContent=summaryText(period); renderChart(); }
+$("#p7").onclick=()=>{period=7;renderReview()};
+$("#p30").onclick=()=>{period=30;renderReview()};
+async function copyText(txt, okMsg){
+  try{ await navigator.clipboard.writeText(txt); toast(okMsg); return }catch(e){}
+  const ta=document.createElement("textarea"); ta.value=txt; ta.style.position="fixed"; ta.style.opacity="0"; document.body.appendChild(ta); ta.select();
+  try{ document.execCommand("copy"); toast(okMsg) }catch(e){ toast("コピーできませんでした。文章を長押ししてコピーしてください") } ta.remove();
+}
+$("#copyBtn").onclick=()=>copyText($("#summary").textContent,"コピーしました。LINEに貼り付けてください");
+
+/* ---------- 設定 ---------- */
+$("#exportBtn").onclick=()=>copyText(JSON.stringify(db),"記録をコピーしました");
+$("#importBtn").onclick=()=>{
+  try{ const o=JSON.parse($("#importBox").value); if(typeof o!=="object"||!o) throw 0; db=Object.assign(db,o); save(); toast("読み込みました"); renderAll() }
+  catch(e){ toast("読み込めませんでした") }
+};
+
+/* ---------- タブ ---------- */
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("on",x===b));
+  ["today","review","set"].forEach(t=>$("#tab-"+t).classList.toggle("hidden",t!==b.dataset.tab));
+  if(b.dataset.tab==="review") renderReview(); window.scrollTo(0,0);
+});
+function renderAll(){ renderItems(); renderWeekly(); renderQuiz(); }
+renderAll();
+</script>
+</body>
+</html>
