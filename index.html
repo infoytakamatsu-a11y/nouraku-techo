@@ -30,7 +30,7 @@ textarea{width:100%;border:1.5px solid var(--line);border-radius:12px;padding:10
 .result{margin-top:12px;padding:12px;border-radius:12px;background:var(--soft)}
 .stamp{font-size:34px;text-align:center}
 nav{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);display:flex;padding-bottom:env(safe-area-inset-bottom)}
-nav button{flex:1;border:0;background:none;color:var(--sub);padding:12px 0;font-size:13px;cursor:pointer;min-height:56px}
+nav button{flex:1;border:0;background:none;color:var(--sub);padding:12px 0;font-size:12px;cursor:pointer;min-height:56px}
 nav button.on{color:var(--main-d);font-weight:700}
 nav span{display:block;font-size:20px}
 .hidden{display:none}
@@ -119,6 +119,7 @@ pre{white-space:pre-wrap;word-break:break-all;background:var(--soft);border-radi
 <nav>
   <button data-tab="today" class="on"><span>📝</span>きょう</button>
   <button data-tab="train"><span>🧠</span>トレーニング</button>
+  <button data-tab="check"><span>🌿</span>チェック</button>
   <button data-tab="review"><span>📊</span>ふり返り</button>
   <button data-tab="set"><span>⚙️</span>設定</button>
 </nav>
@@ -325,7 +326,7 @@ function showTab(t){
   if(t==="review") renderReview(); if(t==="train") renderTrain(); if(t==="check") renderCheck(); if(t==="today") renderBanner();
   window.scrollTo(0,0);
 }
-document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{ if(b.dataset.tab==="check") chkMode="auto"; showTab(b.dataset.tab) });
 
 /* ---------- トレーニング ---------- */
 const PI_DEC=["1415926535","8979323846","2643383279","5028841971","6939937510","5820974944","5923078164","0628620899","8628034825","3421170679"].join("");
